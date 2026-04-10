@@ -63,8 +63,10 @@ model Quiz {
   title       String
   topic       String
   difficulty  String
+  sourceDocumentId String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  sourceDocument SourceDocument? @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
   questions   QuizQuestion[]
   attempts    QuizAttempt[]
 }
@@ -178,4 +180,16 @@ model InterventionAction {
   cooldownUntil  DateTime?
   createdAt      DateTime          @default(now())
   user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SourceDocument {
+  id          String   @id @default(cuid())
+  filename    String
+  mimeType    String
+  storagePath String
+  status      String   @default("UPLOADED")
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  quizzes     Quiz[]
 }

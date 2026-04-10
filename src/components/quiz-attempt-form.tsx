@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UiQuiz } from "@/lib/ui-quizzes";
 import { getAuthHeaders } from "@/lib/auth/client-token";
+import { QuizView } from "@/lib/quiz-types";
 
-export function QuizAttemptForm({ quiz }: { quiz: UiQuiz }) {
+export function QuizAttemptForm({ quiz }: { quiz: QuizView }) {
   const router = useRouter();
   const [status, setStatus] = useState<string>("");
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
@@ -17,40 +17,26 @@ export function QuizAttemptForm({ quiz }: { quiz: UiQuiz }) {
   async function submitAttempt() {
     setIsSubmitting(true);
     setStatus("");
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    const payload = {
-      quizId: quiz.id,
-      selectedAnswers,
-      submittedAt: Date.now(),
-    };
-    sessionStorage.setItem(`quiz-review:${quiz.id}`, JSON.stringify(payload));
-    setIsSubmitting(false);
-    router.push(`/quizzes/review?quizId=${quiz.id}`);
-  async function submitAttempt(formData: FormData) {
-    const startedAt = Date.now();
-    const answers = quiz.questions.map((q) => {
-      const selectedIdx = Number(formData.get(`q-${q.id}`) ?? 0);
-      return {
-        questionId: q.id,
-        selectedIdx,
-        responseMs: 12000,
-      };
-    });
-
+    const answers = visibleQuestions.map((q) => ({
+      questionId: q.id,
+      selectedIdx: selectedAnswers[q.id] ?? 0,
+      responseMs: 12000,
+    }));
     const res = await fetch(`/api/quizzes/${quiz.id}/attempt`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(await getAuthHeaders()) },
       body: JSON.stringify({
-        durationSec: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
+        durationSec: 60,
         answers,
       }),
     });
     const data = await res.json();
-    if (!res.ok) {
-      setStatus("Failed to submit attempt");
+    setIsSubmitting(false);
+    if (!res.ok || !data.attempt?.id) {
+      setStatus("Failed to submit attempt.");
       return;
     }
-    setStatus(`Submitted. Score: ${Math.round((data.attempt.score ?? 0) * 100)}%`);
+    router.push(`/quizzes/review?quizId=${quiz.id}&attemptId=${data.attempt.id}`);
   }
 
   return (
