@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UiQuiz } from "@/lib/ui-quizzes";
+import { getAuthHeaders } from "@/lib/auth/client-token";
 
 export function QuizAttemptForm({ quiz }: { quiz: UiQuiz }) {
   const router = useRouter();
@@ -25,6 +26,31 @@ export function QuizAttemptForm({ quiz }: { quiz: UiQuiz }) {
     sessionStorage.setItem(`quiz-review:${quiz.id}`, JSON.stringify(payload));
     setIsSubmitting(false);
     router.push(`/quizzes/review?quizId=${quiz.id}`);
+  async function submitAttempt(formData: FormData) {
+    const startedAt = Date.now();
+    const answers = quiz.questions.map((q) => {
+      const selectedIdx = Number(formData.get(`q-${q.id}`) ?? 0);
+      return {
+        questionId: q.id,
+        selectedIdx,
+        responseMs: 12000,
+      };
+    });
+
+    const res = await fetch(`/api/quizzes/${quiz.id}/attempt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await getAuthHeaders()) },
+      body: JSON.stringify({
+        durationSec: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
+        answers,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setStatus("Failed to submit attempt");
+      return;
+    }
+    setStatus(`Submitted. Score: ${Math.round((data.attempt.score ?? 0) * 100)}%`);
   }
 
   return (

@@ -4,6 +4,47 @@ import { uiOnlyQuizzes } from "@/lib/ui-quizzes";
 
 export default function QuizzesPage() {
   const quizzes = uiOnlyQuizzes;
+import { DbOfflineNotice } from "@/components/db-offline-notice";
+import { isDatabaseUnavailableError } from "@/lib/db-health";
+import { isBackendDisabled } from "@/lib/backend-toggle";
+import { connectToDatabase } from "@/lib/mongodb";
+import { QuizModel } from "@/models/Quiz";
+
+export const dynamic = "force-dynamic";
+
+export default async function QuizzesPage() {
+  let dbOffline = isBackendDisabled();
+  let quizzes: Array<{
+    id: string;
+    title: string;
+    topic: string;
+    difficulty: string;
+    questions: Array<{ id: string; prompt: string; options: unknown }>;
+  }> = [];
+
+  if (!dbOffline) {
+    try {
+      await connectToDatabase();
+      const rows = await QuizModel.find({}).sort({ createdAt: -1 }).lean();
+      quizzes = rows.map((quiz) => ({
+        id: String(quiz._id),
+        title: quiz.title,
+        topic: quiz.topic,
+        difficulty: quiz.difficulty,
+        questions: (quiz.questions ?? []).map((q: { _id: unknown; prompt: string; options: unknown }) => ({
+          id: String(q._id),
+          prompt: q.prompt,
+          options: q.options,
+        })),
+      }));
+    } catch (error) {
+      if (isDatabaseUnavailableError(error)) {
+        dbOffline = true;
+      } else {
+        throw error;
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen">
