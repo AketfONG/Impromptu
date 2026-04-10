@@ -1,5 +1,6 @@
 import { TopNav } from "@/components/top-nav";
 import { QuizAttemptForm } from "@/components/quiz-attempt-form";
+import { DocumentUploadForm } from "@/components/document-upload";
 import { DbOfflineNotice } from "@/components/db-offline-notice";
 import { isDatabaseUnavailableError } from "@/lib/db-health";
 import { isBackendDisabled } from "@/lib/backend-toggle";
@@ -44,6 +45,17 @@ export default async function QuizzesPage() {
       <TopNav />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8">
         <h1 className="text-2xl font-semibold">Quizzes</h1>
+
+        {/* AI MCQ Generation Section */}
+        <div className="mb-8 border-b-4 border-blue-200 pb-8">
+          <div className="mb-6">
+            <h2 className="mb-2 inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
+              ✨ NEW FEATURE
+            </h2>
+          </div>
+          <DocumentUploadForm />
+        </div>
+
         {dbOffline ? <DbOfflineNotice /> : null}
         {!dbOffline && quizzes.length === 0 ? (
           <p className="rounded border border-slate-200 bg-white p-4 text-slate-600">
