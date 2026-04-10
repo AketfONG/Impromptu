@@ -7,6 +7,9 @@ import { QuizView } from "@/lib/quiz-types";
 
 export function QuizAttemptForm({ quiz }: { quiz: QuizView }) {
   const router = useRouter();
+import { UiQuiz } from "@/lib/ui-quizzes";
+
+export function QuizAttemptForm({ quiz }: { quiz: UiQuiz }) {
   const [status, setStatus] = useState<string>("");
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,6 +40,15 @@ export function QuizAttemptForm({ quiz }: { quiz: QuizView }) {
       return;
     }
     router.push(`/quizzes/review?quizId=${quiz.id}&attemptId=${data.attempt.id}`);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    // Prototype mode: local-only completion feedback.
+    const correct = visibleQuestions.reduce((acc, q) => {
+      const selected = selectedAnswers[q.id];
+      return acc + (selected === q.correctIdx ? 1 : 0);
+    }, 0);
+    const score = Math.round((correct / Math.max(1, visibleQuestions.length)) * 100);
+    setStatus(`Completed. Local score: ${score}%`);
+    setIsSubmitting(false);
   }
 
   return (

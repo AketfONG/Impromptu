@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { firebaseAuth, googleProvider } from "@/lib/firebase/client";
+import { FirebaseError } from "firebase/app";
 import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/auth";
+import { syncSessionCookie } from "@/lib/auth/session-sync";
 
 export function GoogleAuthButton() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [busy, setBusy] = useState(false);
+  const [errorText, setErrorText] = useState("");
 
   useEffect(() => {
     if (!firebaseAuth) return;
@@ -19,8 +24,17 @@ export function GoogleAuthButton() {
   async function handleLogin() {
     if (!firebaseAuth || !googleProvider) return;
     setBusy(true);
+    setErrorText("");
     try {
-      await signInWithPopup(firebaseAuth, googleProvider);
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      await syncSessionCookie(result.user);
+      router.refresh();
+    } catch (error) {
+      if (error instanceof FirebaseError && error.code === "auth/configuration-not-found") {
+        setErrorText("Google sign-in is not enabled in Firebase Auth settings.");
+      } else {
+        setErrorText("Login failed. Please check Firebase Auth configuration.");
+      }
     } finally {
       setBusy(false);
     }
@@ -28,7 +42,19 @@ export function GoogleAuthButton() {
 
   async function handleLogout() {
     if (!firebaseAuth) return;
+    const confirmed = window.confirm("Do you want to log out?");
+    if (!confirmed) return;
     setBusy(true);
+    setErrorText("");
+    try {
+      await signOut(firebaseAuth);
+      await syncSessionCookie(null);
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!firebaseAuth || !googleProvider) {
     return (
       <p className="text-sm text-slate-600">
@@ -37,37 +63,33 @@ export function GoogleAuthButton() {
     );
   }
 
-    try {
-      await signOut(firebaseAuth);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (user) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-slate-700">{user.email}</span>
         <button
           type="button"
           onClick={handleLogout}
           disabled={busy}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-60"
+          className="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
         >
-          Sign out
+          Log out
         </button>
+        {errorText ? <p className="w-full text-xs text-rose-600">{errorText}</p> : null}
       </div>
     );
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleLogin}
-      disabled={busy}
-      className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-60"
-    >
-      Sign in with Google
-    </button>
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={handleLogin}
+        disabled={busy}
+        className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+      >
+        Login
+      </button>
+      {errorText ? <p className="text-xs text-rose-600">{errorText}</p> : null}
+    </div>
   );
 }

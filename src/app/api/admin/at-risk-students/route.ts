@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       reasons: item.reasons,
       assessedAt: item.assessedAt,
     }))
-    .sort((a, b) => b.riskScore - a.riskScore);
+    .sort((a: any, b: any) => b.riskScore - a.riskScore);
 
   return NextResponse.json({ students: rows });
 }
