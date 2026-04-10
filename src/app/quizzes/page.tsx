@@ -1,9 +1,8 @@
+
 import Link from "next/link";
 import { TopNav } from "@/components/top-nav";
 import { DocumentUploadForm } from "@/components/document-upload-form";
 import { SubjectTestSelector } from "@/components/subject-test-selector";
-
-export default function QuizzesPage() {
 import { QuizAttemptForm } from "@/components/quiz-attempt-form";
 import { DbOfflineNotice } from "@/components/db-offline-notice";
 import { isDatabaseUnavailableError } from "@/lib/db-health";
@@ -11,6 +10,8 @@ import { isBackendDisabled } from "@/lib/backend-toggle";
 import { connectToDatabase } from "@/lib/mongodb";
 import { QuizModel } from "@/models/Quiz";
 import { UiQuiz } from "@/lib/ui-quizzes";
+
+export default function QuizzesPage() {
 
 export const dynamic = "force-dynamic";
 
