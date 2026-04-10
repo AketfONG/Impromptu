@@ -13,6 +13,14 @@ type QuizQuestion = {
   _id: Types.ObjectId;
   correctIdx: number;
 };
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function testTypeFromTitle(title: string): "Cold" | "Hot" | "Review" | null {
+  if (title.startsWith("Cold -")) return "Cold";
+  if (title.startsWith("Hot -")) return "Hot";
+  if (title.startsWith("Review -")) return "Review";
+  return null;
+}
 
 const submitAttemptSchema = z.object({
   durationSec: z.number().int().min(1),
@@ -50,6 +58,48 @@ export async function POST(
   const quiz = await QuizModel.findById(id).lean();
   if (!quiz) {
     return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
+  }
+
+  const testType = testTypeFromTitle(String(quiz.title ?? ""));
+  const subject = String(quiz.topic ?? "").trim();
+  if (testType === "Hot" || testType === "Review") {
+    const priorAttempts = await QuizAttemptModel.find({ userId: user._id })
+      .sort({ submittedAt: -1 })
+      .populate("quizId")
+      .lean();
+
+    const latestCold = priorAttempts.find((attempt) => {
+      const q = attempt.quizId as { title?: string; topic?: string } | null;
+      return q && testTypeFromTitle(String(q.title ?? "")) === "Cold" && String(q.topic ?? "").trim() === subject;
+    });
+
+    const latestHot = priorAttempts.find((attempt) => {
+      const q = attempt.quizId as { title?: string; topic?: string } | null;
+      return q && testTypeFromTitle(String(q.title ?? "")) === "Hot" && String(q.topic ?? "").trim() === subject;
+    });
+
+    if (testType === "Hot") {
+      if (!latestCold) {
+        return NextResponse.json(
+          { error: "Hot test is locked. Complete the Cold test for this subject first." },
+          { status: 403 },
+        );
+      }
+      const unlockAt = new Date(latestCold.submittedAt).getTime() + ONE_WEEK_MS;
+      if (Date.now() < unlockAt) {
+        return NextResponse.json(
+          { error: "Hot test is locked until one week after your Cold test attempt." },
+          { status: 403 },
+        );
+      }
+    }
+
+    if (testType === "Review" && !latestHot) {
+      return NextResponse.json(
+        { error: "Review test is locked. Complete the Hot test for this subject first." },
+        { status: 403 },
+      );
+    }
   }
 
   const questions = (quiz.questions ?? []) as QuizQuestion[];

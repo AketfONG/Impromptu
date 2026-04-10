@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TopNav } from "@/components/top-nav";
 import { DocumentUploadForm } from "@/components/document-upload-form";
+import { SubjectTestSelector } from "@/components/subject-test-selector";
 
 export default function QuizzesPage() {
   return (
@@ -12,17 +13,10 @@ export default function QuizzesPage() {
           Upload source documents to generate backend quizzes, then choose a test type.
         </p>
         <DocumentUploadForm />
-        <div className="grid gap-3 md:grid-cols-3">
-          <Link className="rounded-lg border border-slate-200 bg-white p-4 hover:bg-slate-50" href="/tests/cold">
-            Cold Test
-          </Link>
-          <Link className="rounded-lg border border-slate-200 bg-white p-4 hover:bg-slate-50" href="/tests/hot">
-            Hot Test
-          </Link>
-          <Link className="rounded-lg border border-slate-200 bg-white p-4 hover:bg-slate-50" href="/tests/review">
-            Review Test
-          </Link>
-        </div>
+        <SubjectTestSelector />
+        <Link className="text-sm text-slate-600 underline hover:text-slate-900" href="/dashboard">
+          Back to Dashboard
+        </Link>
       </main>
     </div>
   );

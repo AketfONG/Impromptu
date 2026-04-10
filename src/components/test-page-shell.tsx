@@ -8,13 +8,16 @@ import { QuizView } from "@/lib/quiz-types";
 
 type TestType = "Cold" | "Hot" | "Review";
 
-export async function TestPageShell({ testType }: { testType: TestType }) {
+export async function TestPageShell({ testType, subject }: { testType: TestType; subject?: string }) {
   let quiz: QuizView | undefined;
 
   if (!isBackendDisabled()) {
     try {
       const backendQuiz = await db.quiz.findFirst({
-        where: { title: { startsWith: `${testType} -` } },
+        where: {
+          title: { startsWith: `${testType} -` },
+          ...(subject ? { topic: subject } : {}),
+        },
         include: { questions: true },
         orderBy: { createdAt: "desc" },
       });
@@ -34,6 +37,7 @@ export async function TestPageShell({ testType }: { testType: TestType }) {
       <TopNav />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8">
         <h1 className="text-2xl font-semibold">{testType} Test</h1>
+        {subject ? <p className="text-sm text-slate-600">Subject: {subject}</p> : null}
         <p className="rounded border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
           Generated quizzes are loaded from backend when available.
         </p>
