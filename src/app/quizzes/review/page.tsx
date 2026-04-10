@@ -1,40 +1,33 @@
-"use client";
-
 import Link from "next/link";
-import { useMemo } from "react";
-import { useSearchParams } from "next/navigation";
 import { TopNav } from "@/components/top-nav";
-import { getUiQuizById, uiOnlyQuizzes } from "@/lib/ui-quizzes";
+import { db } from "@/lib/db";
 
-type StoredReview = {
-  quizId: string;
-  selectedAnswers: Record<string, number>;
-  submittedAt: number;
-};
+type SearchParams = Promise<{ quizId?: string; attemptId?: string }>;
 
-export default function QuizReviewPage() {
-  const searchParams = useSearchParams();
-  const quizId = searchParams.get("quizId") ?? uiOnlyQuizzes[0]?.id;
-  const quiz = quizId ? getUiQuizById(quizId) : undefined;
+export default async function QuizReviewPage(props: { searchParams: SearchParams }) {
+  const searchParams = await props.searchParams;
+  const quizId = searchParams.quizId;
+  const attemptId = searchParams.attemptId;
+  const quiz = quizId
+    ? await db.quiz.findUnique({
+        where: { id: quizId },
+        include: { questions: true },
+      })
+    : null;
+  const attempt = attemptId
+    ? await db.quizAttempt.findUnique({
+        where: { id: attemptId },
+        include: { questionAttempts: true },
+      })
+    : null;
 
-  const stored = useMemo<StoredReview | null>(() => {
-    if (!quizId || typeof window === "undefined") return null;
-    const raw = sessionStorage.getItem(`quiz-review:${quizId}`);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as StoredReview;
-    } catch {
-      return null;
-    }
-  }, [quizId]);
-
-  if (!quiz) {
+  if (!quiz || !attempt) {
     return (
       <div className="min-h-screen">
         <TopNav />
         <main className="mx-auto w-full max-w-6xl px-4 py-8">
           <p className="rounded border border-slate-200 bg-white p-4 text-slate-700">
-            Quiz not found.
+            Quiz review data not found.
           </p>
         </main>
       </div>
@@ -42,7 +35,9 @@ export default function QuizReviewPage() {
   }
 
   const visibleQuestions = quiz.questions.slice(0, 10);
-  const selectedAnswers = stored?.selectedAnswers ?? {};
+  const selectedAnswers = Object.fromEntries(
+    attempt.questionAttempts.map((item) => [item.questionId, item.selectedIdx]),
+  );
 
   return (
     <div className="min-h-screen">
@@ -52,11 +47,6 @@ export default function QuizReviewPage() {
         <p className="text-sm text-slate-600">
           {quiz.title} · {quiz.topic} · {quiz.difficulty}
         </p>
-        {!stored ? (
-          <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            No completed attempt found for this quiz yet. Complete a quiz first to view selected answers.
-          </p>
-        ) : null}
         <div className="space-y-4">
           {visibleQuestions.map((question, index) => {
             const selectedIdx = selectedAnswers[question.id];
@@ -84,16 +74,6 @@ export default function QuizReviewPage() {
                       Explanation: {question.explanation}
                     </p>
                   </div>
-                  {question.media ? (
-                    <figure className="w-full shrink-0 md:w-44">
-                      <img
-                        src={question.media.src}
-                        alt={question.media.alt}
-                        className="h-auto w-full rounded border border-slate-200 bg-slate-50"
-                      />
-                      <figcaption className="mt-1 text-xs text-slate-500">{question.media.kind}</figcaption>
-                    </figure>
-                  ) : null}
                 </div>
               </section>
             );

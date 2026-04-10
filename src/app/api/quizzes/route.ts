@@ -9,16 +9,17 @@ const createQuizSchema = z.object({
   title: z.string().min(3),
   topic: z.string().min(2),
   difficulty: z.string().min(2),
+  sourceDocumentId: z.string().optional(),
   questions: z
     .array(
       z.object({
         prompt: z.string().min(3),
-        options: z.array(z.string().min(1)).min(2),
-        correctIdx: z.number().int().min(0),
-        explanation: z.string().optional(),
+        options: z.array(z.string().min(1)).length(4),
+        correctIdx: z.number().int().min(0).max(3),
+        explanation: z.string().min(1),
       }),
     )
-    .min(1),
+    .length(10),
 });
 
 export async function GET(req: NextRequest) {
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
     title: parsed.data.title,
     topic: parsed.data.topic,
     difficulty: parsed.data.difficulty,
+    sourceDocumentId: parsed.data.sourceDocumentId,
     questions: parsed.data.questions,
   });
 
