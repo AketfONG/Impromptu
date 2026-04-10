@@ -7,6 +7,9 @@ type DocgenPayload = {
   filename: string;
   mimeType: string;
   questionCount: number;
+  fileContentBase64?: string;
+  subject?: string;
+  week?: number;
 };
 
 export function normalizeQuizForTest(quiz: unknown): GeneratedQuiz | null {

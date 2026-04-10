@@ -26,6 +26,29 @@ export function DocumentUploadForm() {
     <form action={onSubmit} className="rounded-lg border border-slate-200 bg-white p-4">
       <h2 className="text-lg font-semibold">Generate MCQs from Document</h2>
       <p className="mt-1 text-sm text-slate-600">Upload PDF, DOCX, or PPTX. Generation produces 10 questions with 4 choices and one correct answer.</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <label className="block text-sm">
+          Subject
+          <input
+            type="text"
+            name="subject"
+            className="mt-1 w-full rounded border border-slate-300 p-2 text-sm"
+            placeholder="e.g. Data Structures"
+            required
+          />
+        </label>
+        <label className="block text-sm">
+          Week
+          <input
+            type="number"
+            name="week"
+            min={1}
+            className="mt-1 w-full rounded border border-slate-300 p-2 text-sm"
+            placeholder="e.g. 5"
+            required
+          />
+        </label>
+      </div>
       <input
         className="mt-3 block w-full text-sm"
         name="file"

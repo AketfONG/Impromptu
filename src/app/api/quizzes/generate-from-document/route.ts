@@ -18,6 +18,16 @@ export async function POST(req: NextRequest) {
   if (isBackendDisabled()) return backendDisabledResponse();
 
   const formData = await req.formData();
+  const subject = String(formData.get("subject") ?? "").trim();
+  const weekRaw = String(formData.get("week") ?? "").trim();
+  const week = Number(weekRaw);
+  if (!subject) {
+    return NextResponse.json({ error: "Subject is required." }, { status: 400 });
+  }
+  if (!Number.isInteger(week) || week < 1) {
+    return NextResponse.json({ error: "Week must be a positive integer." }, { status: 400 });
+  }
+
   const file = formData.get("file");
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Missing uploaded file." }, { status: 400 });
@@ -40,7 +50,7 @@ export async function POST(req: NextRequest) {
       mimeType: file.type,
       storagePath,
       status: "PROCESSING",
-      metadata: { size: file.size } as object,
+      metadata: { size: file.size, subject, week } as object,
     },
   });
 
@@ -50,6 +60,9 @@ export async function POST(req: NextRequest) {
       filename: file.name,
       mimeType: file.type,
       questionCount: 10,
+      fileContentBase64: Buffer.from(arrayBuffer).toString("base64"),
+      subject,
+      week,
     });
 
     const testTypes = ["Cold", "Hot", "Review"] as const;
@@ -58,8 +71,8 @@ export async function POST(req: NextRequest) {
       for (const testType of testTypes) {
         const quiz = await db.quiz.create({
           data: {
-            title: `${testType} - ${generated.title}`,
-            topic: generated.topic,
+            title: `${testType} - Week ${week} - ${generated.title}`,
+            topic: subject,
             difficulty: generated.difficulty,
             sourceDocumentId: sourceDocument.id,
             questions: {
@@ -79,14 +92,14 @@ export async function POST(req: NextRequest) {
 
     await db.sourceDocument.update({
       where: { id: sourceDocument.id },
-      data: { status: "READY", metadata: { size: file.size, quizzesCreated: created.length } as object },
+      data: { status: "READY", metadata: { size: file.size, subject, week, quizzesCreated: created.length } as object },
     });
 
     return NextResponse.json({ sourceDocument, quizzes: created }, { status: 201 });
   } catch (error) {
     await db.sourceDocument.update({
       where: { id: sourceDocument.id },
-      data: { status: "FAILED", metadata: { size: file.size, error: String(error) } as object },
+      data: { status: "FAILED", metadata: { size: file.size, subject, week, error: String(error) } as object },
     });
     return NextResponse.json({ error: "Failed to generate quiz questions from document." }, { status: 502 });
   }

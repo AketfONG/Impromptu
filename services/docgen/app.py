@@ -1,5 +1,7 @@
 import json
 import os
+import base64
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +20,9 @@ class GenerateRequest(BaseModel):
     filename: str
     mimeType: str
     questionCount: int = Field(default=10, ge=10, le=10)
+    fileContentBase64: str | None = None
+    subject: str | None = None
+    week: int | None = None
 
 
 class GeneratedQuestion(BaseModel):
@@ -88,7 +93,7 @@ def _repair_generated(raw: dict[str, Any]) -> GenerateResponse:
     return GenerateResponse(quizzes=[GeneratedQuiz(**q) for q in safe_quizzes])
 
 
-async def call_qwen(document_text: str, question_count: int) -> GenerateResponse:
+async def call_qwen(document_text: str, question_count: int, subject: str | None, week: int | None) -> GenerateResponse:
     base_url = os.environ.get("QWEN_BASE_URL", "").strip()
     api_key = os.environ.get("QWEN_API_KEY", "").strip()
     model = os.environ.get("QWEN_MODEL", "Qwen2.5-VL-72B-Instruct")
@@ -115,6 +120,12 @@ async def call_qwen(document_text: str, question_count: int) -> GenerateResponse
             ]
         )
 
+    tag_context = ""
+    if subject:
+        tag_context += f"\nSubject: {subject}"
+    if week:
+        tag_context += f"\nWeek: {week}"
+
     prompt = f"""
 Generate MCQs from this document.
 Rules:
@@ -124,6 +135,9 @@ Rules:
 - Exactly 4 options per question
 - Exactly one correct answer
 - Include explanation for every question
+Use the subject/week context if provided.
+Context:
+{tag_context.strip() or "No additional tags"}
 Document:
 {document_text[:14000]}
 """
@@ -154,14 +168,29 @@ Document:
 
 @app.post("/generate-mcq", response_model=GenerateResponse)
 async def generate_mcq(payload: GenerateRequest) -> GenerateResponse:
+    temp_file_path: Path | None = None
     file_path = Path(payload.filePath)
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Uploaded file not found on worker.")
+        if not payload.fileContentBase64:
+            raise HTTPException(status_code=404, detail="Uploaded file not found on worker.")
+        suffix = Path(payload.filename).suffix or ".bin"
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        temp_file.write(base64.b64decode(payload.fileContentBase64))
+        temp_file.flush()
+        temp_file.close()
+        temp_file_path = Path(temp_file.name)
+        file_path = temp_file_path
     try:
         extracted = extract_text_with_docling(str(file_path))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Extraction failed: {exc}") from exc
     try:
-        return await call_qwen(extracted, payload.questionCount)
+        return await call_qwen(extracted, payload.questionCount, payload.subject, payload.week)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Generation failed: {exc}") from exc
+    finally:
+        if temp_file_path is not None:
+            try:
+                temp_file_path.unlink(missing_ok=True)
+            except Exception:
+                pass
