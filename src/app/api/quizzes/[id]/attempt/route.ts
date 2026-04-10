@@ -133,6 +133,57 @@ export async function POST(
     meta: { quizId: String(quiz._id), score },
   });
 
+  // After Cold quiz completion, generate Hot quiz if not exists
+  if (testType === "Cold") {
+    // Find the source document ID
+    const sourceDocumentId = quiz.sourceDocumentId || null;
+    if (sourceDocumentId) {
+      // Check if Hot quiz already exists for this subject/week/document
+      const hotQuiz = await QuizModel.findOne({
+        sourceDocumentId,
+        topic: subject,
+        difficulty: "Hot",
+      });
+      if (!hotQuiz) {
+        // Call the followup generator
+        await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/quizzes/generate-followup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceDocumentId,
+            subject,
+            week: quiz.title.match(/Week (\d+)/)?.[1] ? Number(quiz.title.match(/Week (\d+)/)[1]) : undefined,
+            type: "Hot",
+          }),
+        });
+      }
+    }
+  }
+
+  // After Hot quiz completion, generate Review quiz if not exists
+  if (testType === "Hot") {
+    const sourceDocumentId = quiz.sourceDocumentId || null;
+    if (sourceDocumentId) {
+      const reviewQuiz = await QuizModel.findOne({
+        sourceDocumentId,
+        topic: subject,
+        difficulty: "Review",
+      });
+      if (!reviewQuiz) {
+        await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/quizzes/generate-followup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceDocumentId,
+            subject,
+            week: quiz.title.match(/Week (\d+)/)?.[1] ? Number(quiz.title.match(/Week (\d+)/)[1]) : undefined,
+            type: "Review",
+          }),
+        });
+      }
+    }
+  }
+
   const cycle = await runInterventionCycle(String(user._id));
   return NextResponse.json({ attempt: attempt.toObject(), assessment: cycle.assessment, intervention: cycle.intervention });
 }

@@ -65,29 +65,28 @@ export async function POST(req: NextRequest) {
       week,
     });
 
-    const testTypes = ["Cold", "Hot", "Review"] as const;
+
+    // Only create the Cold quiz on upload
     const created = [];
     for (const generated of generatedQuizzes) {
-      for (const testType of testTypes) {
-        const quiz = await db.quiz.create({
-          data: {
-            title: `${testType} - Week ${week} - ${generated.title}`,
-            topic: subject,
-            difficulty: generated.difficulty,
-            sourceDocumentId: sourceDocument.id,
-            questions: {
-              create: generated.questions.map((q) => ({
-                prompt: q.prompt,
-                options: q.options,
-                correctIdx: q.correctIdx,
-                explanation: q.explanation,
-              })),
-            },
+      const quiz = await db.quiz.create({
+        data: {
+          title: `Cold - Week ${week} - ${generated.title}`,
+          topic: subject,
+          difficulty: "Cold",
+          sourceDocumentId: sourceDocument.id,
+          questions: {
+            create: generated.questions.map((q) => ({
+              prompt: q.prompt,
+              options: q.options,
+              correctIdx: q.correctIdx,
+              explanation: q.explanation,
+            })),
           },
-          include: { questions: true },
-        });
-        created.push(quiz);
-      }
+        },
+        include: { questions: true },
+      });
+      created.push(quiz);
     }
 
     await db.sourceDocument.update({

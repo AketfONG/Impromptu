@@ -1,86 +1,84 @@
 
+"use client";
 import Link from "next/link";
 import { TopNav } from "@/components/top-nav";
-import { DocumentUploadForm } from "@/components/document-upload-form";
-import { SubjectTestSelector } from "@/components/subject-test-selector";
 import { QuizAttemptForm } from "@/components/quiz-attempt-form";
-import { DbOfflineNotice } from "@/components/db-offline-notice";
-import { isDatabaseUnavailableError } from "@/lib/db-health";
-import { isBackendDisabled } from "@/lib/backend-toggle";
-import { connectToDatabase } from "@/lib/mongodb";
-import { QuizModel } from "@/models/Quiz";
 import { UiQuiz } from "@/lib/ui-quizzes";
-
-export default function QuizzesPage() {
 
 export const dynamic = "force-dynamic";
 
-export default async function QuizzesPage() {
-  let dbOffline = isBackendDisabled();
-  let quizzes: UiQuiz[] = [];
+import { useEffect, useState } from "react";
 
-  if (!dbOffline) {
-    try {
-      await connectToDatabase();
-      const rows = await QuizModel.find({}).sort({ createdAt: -1 }).lean();
-      quizzes = rows.map((quiz) => ({
-        id: String(quiz._id),
-        title: quiz.title,
-        topic: quiz.topic,
-        difficulty: quiz.difficulty,
-        questions: (quiz.questions ?? []).map((q: { _id: unknown; prompt: string; options: unknown }) => ({
-          id: String(q._id),
-          prompt: q.prompt,
-          options: (Array.isArray(q.options) ? q.options : []).map((option) => String(option)),
-          correctIdx: Number((q as { correctIdx?: number }).correctIdx ?? 0),
-          explanation: String((q as { explanation?: string }).explanation ?? "No explanation provided."),
-        })),
-      }));
-    } catch (error) {
-      if (isDatabaseUnavailableError(error)) {
-        dbOffline = true;
-      } else {
-        throw error;
+export default function QuizzesPage() {
+  const [quizzes, setQuizzes] = useState<UiQuiz[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchQuizzes() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/quizzes");
+        if (!res.ok) throw new Error("Failed to fetch quizzes");
+        const data = await res.json();
+        setQuizzes(data.quizzes || []);
+      } catch (err: any) {
+        setError(err.message || "Unknown error");
+      } finally {
+        setLoading(false);
       }
     }
-  }
+    fetchQuizzes();
+  }, []);
+
+  // Categorize quizzes by difficulty
+  const cold = quizzes.filter((q) => q.difficulty.toLowerCase() === "cold");
+  const hot = quizzes.filter((q) => q.difficulty.toLowerCase() === "hot");
+  const review = quizzes.filter((q) => q.difficulty.toLowerCase() === "review");
 
   return (
     <div className="min-h-screen">
       <TopNav />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8">
-        <h1 className="text-2xl font-semibold">Tests</h1>
-        <p className="rounded border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
-          Upload source documents to generate backend quizzes, then choose a test type.
-        </p>
-        <DocumentUploadForm />
-        <SubjectTestSelector />
-        <Link className="text-sm text-slate-600 underline hover:text-slate-900" href="/dashboard">
-          Back to Dashboard
-        </Link>
         <h1 className="text-2xl font-semibold">Quizzes</h1>
-        {dbOffline ? <DbOfflineNotice /> : null}
-        {!dbOffline && quizzes.length === 0 ? (
-          <p className="rounded border border-slate-200 bg-white p-4 text-slate-600">
-            No quizzes yet. Click Initialize Demo Data on Home.
-          </p>
-        ) : null}
-        {!dbOffline ? (
-          <div className="space-y-4">
-            {quizzes.map((quiz) => (
-              <section key={quiz.id} className="rounded-lg border border-slate-200 bg-white p-4">
-                <div className="mb-3">
-                  <h2 className="text-lg font-semibold">{quiz.title}</h2>
-                  <p className="text-sm text-slate-600">
-                    {quiz.topic} · {quiz.difficulty}
-                  </p>
-                </div>
-                <QuizAttemptForm quiz={quiz} />
-              </section>
-            ))}
-          </div>
-        ) : null}
+        {loading && <p>Loading quizzes...</p>}
+        {error && <p className="text-red-600">{error}</p>}
+        {!loading && !error && (
+          <>
+            <QuizCategory title="Cold" quizzes={cold} />
+            <QuizCategory title="Hot" quizzes={hot} />
+            <QuizCategory title="Review" quizzes={review} />
+            {quizzes.length === 0 && (
+              <p className="rounded border border-slate-200 bg-white p-4 text-slate-600">
+                No quizzes yet. Click Initialize Demo Data on Home.
+              </p>
+            )}
+          </>
+        )}
       </main>
     </div>
+  );
+}
+
+function QuizCategory({ title, quizzes }: { title: string; quizzes: UiQuiz[] }) {
+  if (quizzes.length === 0) return null;
+  return (
+    <section>
+      <h2 className="text-xl font-semibold mb-2">{title} Quizzes</h2>
+      <div className="space-y-4">
+        {quizzes.map((quiz) => (
+          <section key={quiz.id} className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="mb-3">
+              <h3 className="text-lg font-semibold">{quiz.title}</h3>
+              <p className="text-sm text-slate-600">
+                {quiz.topic} · {quiz.difficulty}
+              </p>
+            </div>
+            <QuizAttemptForm quiz={quiz} />
+          </section>
+        ))}
+      </div>
+    </section>
   );
 }

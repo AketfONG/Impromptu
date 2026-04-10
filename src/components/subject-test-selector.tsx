@@ -23,12 +23,22 @@ export function SubjectTestSelector() {
       const res = await fetch("/api/tests/progression", {
         headers: await getAuthHeaders(),
       });
-      const data = await res.json();
+      let data = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch {
+          data = {};
+        }
+      } else {
+        data = {};
+      }
       if (!res.ok) {
-        setStatus(data.error ?? "Failed to load subjects.");
+        setStatus((data as any).error ?? "Failed to load subjects.");
         return;
       }
-      setRows(data.subjects ?? []);
+      setRows((data as any).subjects ?? []);
       setStatus("");
     }
     void load();

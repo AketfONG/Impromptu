@@ -4,9 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthHeaders } from "@/lib/auth/client-token";
 import { QuizView } from "@/lib/quiz-types";
-
-export function QuizAttemptForm({ quiz }: { quiz: QuizView }) {
-  const router = useRouter();
 import { UiQuiz } from "@/lib/ui-quizzes";
 
 export function QuizAttemptForm({ quiz }: { quiz: UiQuiz }) {
