@@ -1,6 +1,7 @@
 import json
 import os
 import base64
+import random
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -44,9 +45,72 @@ class GenerateResponse(BaseModel):
     quizzes: list[GeneratedQuiz]
 
 
+
 app = FastAPI(title="Docgen Service")
 
+def _balance_answer_positions(questions: list[dict[str, Any]]) -> None:
+    """Permute options so correct answers are spread across A–D (no single-index bias)."""
+    n = len(questions)
+    if n != 10:
+        return
+    targets = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1]
+    random.shuffle(targets)
+    for i, q in enumerate(questions):
+        opts = q.get("options", [])[:4]
+        while len(opts) < 4:
+            opts.append(f"Option {chr(65 + len(opts))}")
+        c = q.get("correctIdx", 0)
+        if not isinstance(c, int) or c < 0 or c > 3:
+            c = 0
+        correct = opts[c]
+        wrong = [opts[j] for j in range(4) if j != c]
+        random.shuffle(wrong)
+        t = targets[i]
+        new_opts: list[str] = [""] * 4
+        new_opts[t] = correct
+        wpos = 0
+        for pos in range(4):
+            if pos == t:
+                continue
+            new_opts[pos] = wrong[wpos]
+            wpos += 1
+        q["options"] = new_opts
+        q["correctIdx"] = t
 
+
+<<<<<<< HEAD
+=======
+def _balance_answer_positions(questions: list[dict[str, Any]]) -> None:
+    """Permute options so correct answers are spread across A–D (no single-index bias)."""
+    n = len(questions)
+    if n != 10:
+        return
+    targets = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1]
+    random.shuffle(targets)
+    for i, q in enumerate(questions):
+        opts = q.get("options", [])[:4]
+        while len(opts) < 4:
+            opts.append(f"Option {chr(65 + len(opts))}")
+        c = q.get("correctIdx", 0)
+        if not isinstance(c, int) or c < 0 or c > 3:
+            c = 0
+        correct = opts[c]
+        wrong = [opts[j] for j in range(4) if j != c]
+        random.shuffle(wrong)
+        t = targets[i]
+        new_opts: list[str] = [""] * 4
+        new_opts[t] = correct
+        wpos = 0
+        for pos in range(4):
+            if pos == t:
+                continue
+            new_opts[pos] = wrong[wpos]
+            wpos += 1
+        q["options"] = new_opts
+        q["correctIdx"] = t
+
+
+>>>>>>> 5a39ef12abdacee50cb605aa0b95a128473f7402
 def extract_text_with_docling(file_path: str) -> str:
     if DocumentConverter is None:
         raise RuntimeError("Docling is not installed in this environment.")
@@ -82,6 +146,7 @@ def _repair_generated(raw: dict[str, Any]) -> GenerateResponse:
                     "media": q.get("media"),
                 }
             )
+        _balance_answer_positions(normalized_questions)
         safe_quizzes.append(
             {
                 "title": (quiz.get("title") or "Generated Quiz").strip(),
@@ -135,6 +200,7 @@ Rules:
 - Exactly 4 options per question
 - Exactly one correct answer
 - Include explanation for every question
+- Vary correctIdx across questions (values 0–3); do not use the same index for every question
 Use the subject/week context if provided.
 Context:
 {tag_context.strip() or "No additional tags"}

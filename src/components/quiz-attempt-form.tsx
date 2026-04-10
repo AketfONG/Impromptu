@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { getAuthHeaders } from "@/lib/auth/client-token";
+import { QuizView } from "@/lib/quiz-types";
+
+export function QuizAttemptForm({ quiz }: { quiz: QuizView }) {
+  const router = useRouter();
 import { UiQuiz } from "@/lib/ui-quizzes";
 
 export function QuizAttemptForm({ quiz }: { quiz: UiQuiz }) {
@@ -14,6 +20,26 @@ export function QuizAttemptForm({ quiz }: { quiz: UiQuiz }) {
   async function submitAttempt() {
     setIsSubmitting(true);
     setStatus("");
+    const answers = visibleQuestions.map((q) => ({
+      questionId: q.id,
+      selectedIdx: selectedAnswers[q.id] ?? 0,
+      responseMs: 12000,
+    }));
+    const res = await fetch(`/api/quizzes/${quiz.id}/attempt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await getAuthHeaders()) },
+      body: JSON.stringify({
+        durationSec: 60,
+        answers,
+      }),
+    });
+    const data = await res.json();
+    setIsSubmitting(false);
+    if (!res.ok || !data.attempt?.id) {
+      setStatus("Failed to submit attempt.");
+      return;
+    }
+    router.push(`/quizzes/review?quizId=${quiz.id}&attemptId=${data.attempt.id}`);
     await new Promise((resolve) => setTimeout(resolve, 600));
     // Prototype mode: local-only completion feedback.
     const correct = visibleQuestions.reduce((acc, q) => {
